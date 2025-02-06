@@ -1,0 +1,26 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-2">
+            <a href="?handler=OpenBrowser" class="btn btn-outline-info">Login</a>
+        </div>
+    </div>
+    <form method="get">
+        <input type="hidden" name="handler" value="StartScrapping"/>
+        <div class="row">
+            <div class="col-lg-10">
+                <input name="url" type="url" class="form-control"/>
+            </div>
+            <div class="col-lg-2">
+                <button type="submit" class="btn btn-success">
+                    start!
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
