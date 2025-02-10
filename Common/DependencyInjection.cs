@@ -1,4 +1,5 @@
-﻿using Serilog;
+﻿using MachineTrading.Services;
+using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.MSSqlServer;
 
@@ -20,5 +21,10 @@ public static class DependencyInjection
             ).CreateLogger();
         
         builder.Services.AddSerilog(log);
+    }
+
+    public static void AddDependencies(this WebApplicationBuilder builder)
+    {
+        builder.Services.AddScoped<PlaywrightService>();
     }
 }

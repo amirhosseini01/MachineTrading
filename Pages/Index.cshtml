@@ -4,17 +4,26 @@
     ViewData["Title"] = "Home page";
 }
 <div class="container-fluid">
-    <div class="row">
+    <div class="row mb-3">
         <div class="col-2">
             <a href="?handler=OpenBrowser" class="btn btn-outline-info">Login</a>
         </div>
     </div>
     <form method="get">
         <input type="hidden" name="handler" value="StartScrapping"/>
-        <div class="row">
-            <div class="col-lg-10">
+        <div class="row gy-3">
+            <div class="col-lg-8">
+                <label>url</label>
                 <input name="url" type="url" class="form-control"/>
             </div>
+            <div class="col-lg-2">
+                <label>scrap setting</label>
+                <select class="form-control" name="continueUntilPrevious">
+                    <option value="true" selected>continue until previous</option>
+                    <option value="false">all the information</option>
+                </select>
+            </div>
+            <div class="col-lg-2"></div>
             <div class="col-lg-2">
                 <button type="submit" class="btn btn-success">
                     start!

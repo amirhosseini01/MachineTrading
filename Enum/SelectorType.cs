@@ -11,5 +11,6 @@ public enum SelectorType
     Comment,
     Like,
     UnLike,
+    Pinned,
     
 }
