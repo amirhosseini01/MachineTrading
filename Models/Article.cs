@@ -8,6 +8,8 @@ public class Article
     [Key]
     [StringLength(450)]
     public required string Link { get; set; }
+    
+    public int AddressId { get; set; }
 
     [StringLength(maximumLength: 100)]
     public string? ParentLink { get; set; }
@@ -30,4 +32,6 @@ public class Article
     public string? LikeCount { get; set; }
 
     public DateTime CreateDate { get; set; }
+
+    public virtual Address? Address { get; set; }
 }

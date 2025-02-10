@@ -6,27 +6,40 @@ using Microsoft.Playwright;
 
 namespace MachineTrading.Services;
 
-public class PlaywrightService(ISelectorRepo selectorRepo, IArticleRepo articleRepo)
+public class PlaywrightService(ISelectorRepo selectorRepo, IArticleRepo articleRepo, IAddressRepo addressRepo)
 {
     private const string UserDataDir = @"C:\Users\Amir\Desktop\MachineTrading\_browserdata";
 
-    public async Task OpenBrowser(CancellationToken ct = default)
+    public async Task OpenBrowser(int addressId, CancellationToken ct = default)
     {
+        var address = await addressRepo.FindAsync(addressId, ct);
+        if (address is null)
+        {
+            throw new Exception("address not founded!");
+        }
+        
         using var playwright = await Playwright.CreateAsync();
         await using var browser = await playwright.Chromium.LaunchPersistentContextAsync(UserDataDir, new BrowserTypeLaunchPersistentContextOptions { Headless = false, Timeout = 3_000_000 });
 
         var page = browser.Pages.Count > 0 ? browser.Pages[0] : await browser.NewPageAsync();
+        await page.GotoAsync(address.Url);
         await page.WaitForTimeoutAsync(100_000);
     }
 
-    public async Task StartScrapping(string url, bool continueUntilPrevious = true, CancellationToken ct = default)
+    public async Task StartScrapping(int addressId, bool continueUntilPrevious = true, CancellationToken ct = default)
     {
+        var address = await addressRepo.FindAsync(addressId, ct);
+        if (address is null)
+        {
+            throw new Exception("address not founded!");
+        }
+
         using var playwright = await Playwright.CreateAsync();
         await using var browser = await playwright.Chromium.LaunchPersistentContextAsync(UserDataDir, new BrowserTypeLaunchPersistentContextOptions { Headless = false, Timeout = 3_000_000 });
 
         var page = browser.Pages.Count > 0 ? browser.Pages[0] : await browser.NewPageAsync();
 
-        await page.GotoAsync(url);
+        await page.GotoAsync(address.Url);
         await page.WaitForTimeoutAsync(2_000);
         var continueScrapping = true;
         var articles = new List<Article>();

@@ -1,4 +1,6 @@
-﻿using MachineTrading.Services;
+﻿using MachineTrading.Repository.Contracts;
+using MachineTrading.Repository.Implementations;
+using MachineTrading.Services;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.MSSqlServer;
@@ -26,5 +28,9 @@ public static class DependencyInjection
     public static void AddDependencies(this WebApplicationBuilder builder)
     {
         builder.Services.AddScoped<PlaywrightService>();
+        
+        builder.Services.AddScoped<IAddressRepo, AddressRepo>();
+        builder.Services.AddScoped<ISelectorRepo, SelectorRepo>();
+        builder.Services.AddScoped<IArticleRepo, ArticleRepo>();
     }
 }

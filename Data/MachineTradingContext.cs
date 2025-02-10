@@ -8,8 +8,8 @@ public class MachineTradingContext: DbContext
 {
     public MachineTradingContext(DbContextOptions<MachineTradingContext> options): base(options)
     {
-        
     }
     public DbSet<Article> Articles { get; set; }
+    public DbSet<Address> Addresses { get; set; }
     public DbSet<Selector> Selectors { get; set; }
 }
