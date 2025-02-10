@@ -8,9 +8,10 @@ using Serilog;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddSerilog();
+builder.AddDependencies();
 
 // Add services to the container.
-builder.Services.AddRazorPages();
+builder.Services.AddRazorPages().AddRazorRuntimeCompilation();
 
 builder.Services.AddDbContext<MachineTradingContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MachineTradingContext")));
