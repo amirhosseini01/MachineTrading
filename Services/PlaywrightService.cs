@@ -17,7 +17,7 @@ public class PlaywrightService(ISelectorRepo selectorRepo, IArticleRepo articleR
         {
             throw new Exception("address not founded!");
         }
-        
+
         using var playwright = await Playwright.CreateAsync();
         await using var browser = await playwright.Chromium.LaunchPersistentContextAsync(UserDataDir, new BrowserTypeLaunchPersistentContextOptions { Headless = false, Timeout = 3_000_000 });
 
@@ -33,7 +33,10 @@ public class PlaywrightService(ISelectorRepo selectorRepo, IArticleRepo articleR
         {
             throw new Exception("address not founded!");
         }
+    }
 
+    public async Task StartScrapping(Address address, bool continueUntilPrevious = true, CancellationToken ct = default)
+    {
         using var playwright = await Playwright.CreateAsync();
         await using var browser = await playwright.Chromium.LaunchPersistentContextAsync(UserDataDir, new BrowserTypeLaunchPersistentContextOptions { Headless = false, Timeout = 3_000_000 });
 
@@ -197,6 +200,20 @@ public class PlaywrightService(ISelectorRepo selectorRepo, IArticleRepo articleR
         {
             await articleRepo.AddRangeAsync(articles, ct);
             await articleRepo.SaveChangesAsync(ct);
+        }
+    }
+
+    public async Task StartScrapping(CancellationToken ct = default)
+    {
+        var addresses = await addressRepo.GetAll(ct);
+        if (addresses.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var address in addresses)
+        {
+            await StartScrapping(address: address, ct: ct);
         }
     }
 

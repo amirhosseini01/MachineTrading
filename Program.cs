@@ -1,4 +1,6 @@
 using System.Net.Mime;
+using Hangfire;
+using MachineTrading.BackgroundJob;
 using MachineTrading.Common;
 using MachineTrading.Data;
 using Microsoft.AspNetCore.Diagnostics;
@@ -9,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddSerilog();
 builder.AddDependencies();
+builder.AddHangfire();
 
 // Add services to the container.
 builder.Services.AddRazorPages().AddRazorRuntimeCompilation();
@@ -47,10 +50,18 @@ app.UseExceptionHandler(exceptionHandlerApp =>
     });
 });
 
-if (!app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment())
+{
+    app.UseHangfireDashboard();
+    
+}
+else
 {
     app.UseHsts();
 }
+
+
+HangfireHelper.SetUpdateArticleJobId();
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

@@ -1,4 +1,5 @@
-﻿using MachineTrading.Repository.Contracts;
+﻿using Hangfire;
+using MachineTrading.Repository.Contracts;
 using MachineTrading.Repository.Implementations;
 using MachineTrading.Services;
 using Serilog;
@@ -32,5 +33,16 @@ public static class DependencyInjection
         builder.Services.AddScoped<IAddressRepo, AddressRepo>();
         builder.Services.AddScoped<ISelectorRepo, SelectorRepo>();
         builder.Services.AddScoped<IArticleRepo, ArticleRepo>();
+    }
+    
+    public static void AddHangfire(this WebApplicationBuilder builder)
+    {
+        builder.Services.AddHangfire(configuration => configuration
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UseSqlServerStorage(builder.Configuration.GetConnectionString("MachineTradingContext")));
+        
+        builder.Services.AddHangfireServer();
     }
 }
