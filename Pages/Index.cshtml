@@ -3,53 +3,52 @@
 @{
     ViewData["Title"] = "Home page";
 }
-<div class="container-fluid">
-    <form method="get">
-        <input type="hidden" name="handler" value="StartScrapping"/>
-        <div class="row gy-3">
-            <div class="col-lg-8">
-                <label>address</label>
-                <select class="form-control" name="addressId">
-                    @if (Model.Addresses is not null && Model.Addresses.Count > 0)
+<form method="get">
+    <input type="hidden" name="handler" value="StartScrapping"/>
+    <div class="row gy-3">
+        <div class="col-lg-8">
+            <label>address</label>
+            <select class="form-control" name="addressId">
+                @if (Model.Addresses is not null && Model.Addresses.Count > 0)
+                {
+                    @foreach (var item in Model.Addresses)
                     {
-                        @foreach (var item in Model.Addresses)
-                        {
-                            <option value="@item.Id">@item.Url</option>
-                        }    
+                        <option value="@item.Id">@item.Url</option>
                     }
-                </select>
-            </div>
-            <div class="col-lg-2">
-                <label>scrap setting</label>
-                <select class="form-control" name="continueUntilPrevious">
-                    <option value="true" selected>continue until previous</option>
-                    <option value="false">all the information</option>
-                </select>
-            </div>
-            <div class="col-lg-2"></div>
-            <div class="col-lg-2">
-                <button type="submit" class="btn btn-success">
-                    start!
-                </button>
-            </div>
-            <div class="col-2">
-                <button id="btnLogin" type="button" class="btn btn-success">
-                    login
-                </button>
-            </div>
+                }
+            </select>
         </div>
-    </form>
-</div>
+        <div class="col-lg-2">
+            <label>scrap setting</label>
+            <select class="form-control" name="continueUntilPrevious">
+                <option value="true" selected>continue until previous</option>
+                <option value="false">all the information</option>
+            </select>
+        </div>
+        <div class="col-lg-2"></div>
+        <div class="col-lg-2">
+            <button type="submit" class="btn btn-success">
+                start!
+            </button>
+        </div>
+        <div class="col-2">
+            <button type="button" class="btn btn-success" onclick="OpenBrowser()">
+                login
+            </button>
+        </div>
+    </div>
+</form>
 
 @section Scripts{
     <script>
-        $('#btnLogin').click(function () {
+
+        function OpenBrowser() {
             $.ajax({
                 type: 'get',
                 url: '?handler=OpenBrowser',
                 data: { addressId: $('form select[name=continueUntilPrevious]').val() }
             })
-        })
+        }
     
     </script>
 }
