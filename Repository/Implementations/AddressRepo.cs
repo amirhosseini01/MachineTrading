@@ -13,4 +13,9 @@ public class AddressRepo(MachineTradingContext context): GenericRepository<Addre
     {
         return await _store.OrderBy(x=> x.Id).ToListAsync(ct);
     }
+
+    public async Task<bool> IsUrlExist(string url)
+    {
+        return await _store.AnyAsync(x => x.Url == url.ToLower());
+    }
 }
