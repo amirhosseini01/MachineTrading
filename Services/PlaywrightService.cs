@@ -1,14 +1,17 @@
-﻿using HtmlAgilityPack;
+﻿using Hangfire;
+using HtmlAgilityPack;
 using MachineTrading.Enum;
 using MachineTrading.Models;
 using MachineTrading.Repository.Contracts;
 using Microsoft.Playwright;
+using Serilog.Core;
 
 namespace MachineTrading.Services;
 
-public class PlaywrightService(ISelectorRepo selectorRepo, IArticleRepo articleRepo, IAddressRepo addressRepo)
+public class PlaywrightService(ISelectorRepo selectorRepo, IArticleRepo articleRepo, IAddressRepo addressRepo, ILogger<PlaywrightService> logger)
 {
     private const string UserDataDir = @"C:\Users\Amir\Desktop\MachineTrading\_browserdata";
+    const int ThirtyMinuteAsMilliSecond = 1_800_000;
 
     public async Task OpenBrowser(int addressId, CancellationToken ct = default)
     {
@@ -19,7 +22,7 @@ public class PlaywrightService(ISelectorRepo selectorRepo, IArticleRepo articleR
         }
 
         using var playwright = await Playwright.CreateAsync();
-        await using var browser = await playwright.Chromium.LaunchPersistentContextAsync(UserDataDir, new BrowserTypeLaunchPersistentContextOptions { Headless = false, Timeout = 3_000_000 });
+        await using var browser = await playwright.Chromium.LaunchPersistentContextAsync(UserDataDir, new BrowserTypeLaunchPersistentContextOptions { Headless = false, Timeout = ThirtyMinuteAsMilliSecond });
 
         var page = browser.Pages.Count > 0 ? browser.Pages[0] : await browser.NewPageAsync();
         await page.GotoAsync(address.Url);
@@ -33,176 +36,211 @@ public class PlaywrightService(ISelectorRepo selectorRepo, IArticleRepo articleR
         {
             throw new Exception("address not founded!");
         }
+
+        await StartScrapping(address, continueUntilPrevious, ct);
     }
 
     public async Task StartScrapping(Address address, bool continueUntilPrevious = true, CancellationToken ct = default)
     {
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await playwright.Chromium.LaunchPersistentContextAsync(UserDataDir, new BrowserTypeLaunchPersistentContextOptions { Headless = false, Timeout = 3_000_000 });
-
-        var page = browser.Pages.Count > 0 ? browser.Pages[0] : await browser.NewPageAsync();
-
-        await page.GotoAsync(address.Url);
-        await page.WaitForTimeoutAsync(2_000);
-        var continueScrapping = true;
+        
         var articles = new List<Article>();
-        var selectors = await selectorRepo.GetAll(ct: ct);
-        var previousArticles = await articleRepo.GetAll(takeSize: 1000, ct: ct);
-        while (continueScrapping)
+        try
         {
-            var articleSelector = selectors.First(x => x.Type == SelectorType.Article).Value;
-            var allElementCount = await page.Locator(articleSelector)
-                .CountAsync();
-            if (allElementCount == 0)
+            using var playwright = await Playwright.CreateAsync();
+            await using var browser = await playwright.Chromium.LaunchPersistentContextAsync(UserDataDir, new BrowserTypeLaunchPersistentContextOptions { Headless = false, Timeout =  ThirtyMinuteAsMilliSecond});
+
+            var page = browser.Pages.Count > 0 ? browser.Pages[0] : await browser.NewPageAsync();
+
+            await page.GotoAsync(address.Url);
+            await page.WaitForTimeoutAsync(2_000);
+            var continueScrapping = true;
+            
+            var selectors = await selectorRepo.GetAll(ct: ct);
+            var previousArticles = await articleRepo.GetAll(takeSize: 1000, ct: ct);
+            int duplicateCounter = 0;
+            while (continueScrapping)
             {
-                return;
-            }
-
-
-            var elements = await page.Locator(articleSelector)
-                .AllAsync();
-            foreach (var element in elements)
-            {
-                var elementCount = await element.CountAsync();
-                if (elementCount == 0) continue;
-
-                var link = await element
-                    .Locator(selectors.First(x => x.Type == SelectorType.Link).Value)
-                    .First
-                    .GetAttributeAsync("href");
-
-                if (string.IsNullOrEmpty(link))
+                duplicateCounter++;
+                
+                var articleSelector = selectors.First(x => x.Type == SelectorType.Article).Value;
+                var allElementCount = await page.Locator(articleSelector)
+                    .CountAsync();
+                if (allElementCount == 0)
                 {
-                    return;
+                    continue;
                 }
 
-                string? pinned = null;
-                var pinnedCount = await element.Locator(selectors.First(x => x.Type == SelectorType.Pinned).Value).CountAsync();
-                if (pinnedCount > 0)
+                var elements = await page.Locator(articleSelector)
+                    .AllAsync();
+                foreach (var element in elements)
                 {
-                    pinned = await element.Locator(selectors.First(x => x.Type == SelectorType.Pinned).Value).First.InnerTextAsync();
-                }
+                    duplicateCounter++;
+                    var elementCount = await element.CountAsync();
+                    if (elementCount == 0)
+                    {
+                        logger.LogWarning($"no element founded! article count{articles.Count}, url: {address.Url}");
+                        continue;
+                    }
 
-                if (articles.Any(x => x.Link == link)) continue;
+                    var link = await element
+                        .Locator(selectors.First(x => x.Type == SelectorType.Link).Value)
+                        .First
+                        .GetAttributeAsync("href");
 
-                if (previousArticles.Any(x => x.Link == link))
-                {
-                    if (!string.IsNullOrEmpty(pinned) && pinned == nameof(SelectorType.Pinned))
+                    if (string.IsNullOrEmpty(link))
                     {
                         continue;
                     }
 
-                    if (continueUntilPrevious)
+                    string? pinned = null;
+                    var pinnedCount = await element.Locator(selectors.First(x => x.Type == SelectorType.Pinned).Value).CountAsync();
+                    if (pinnedCount > 0)
                     {
-                        continueScrapping = false;
-                        break;
+                        pinned = await element.Locator(selectors.First(x => x.Type == SelectorType.Pinned).Value).First.InnerTextAsync();
                     }
 
-                    // else
-                    continue;
-                }
+                    if (articles.Any(x => x.Link == link)) continue;
 
-                if (await articleRepo.IsExistLink(link: link, ct: ct)) continue;
+                    if (previousArticles.Any(x => x.Link == link))
+                    {
+                        if (!string.IsNullOrEmpty(pinned) && pinned == nameof(SelectorType.Pinned))
+                        {
+                            continue;
+                        }
 
-                var time = await element
-                    .Locator(selectors.First(x => x.Type == SelectorType.Time).Value)
-                    .First
-                    .GetAttributeAsync("datetime");
+                        if (continueUntilPrevious)
+                        {
+                            continueScrapping = false;
+                            break;
+                        }
 
-                string? text = null;
-                var textSelector = selectors.First(x => x.Type == SelectorType.Text).Value;
-                var textCount = await element
-                    .Locator(textSelector)
-                    .CountAsync();
-                if (textCount > 0)
-                {
-                    text = await element
-                        .Locator(textSelector)
+                        // else
+                        continue;
+                    }
+
+                    if (await articleRepo.IsExistLink(link: link, ct: ct)) continue;
+
+                    duplicateCounter = 0;
+
+                    var time = await element
+                        .Locator(selectors.First(x => x.Type == SelectorType.Time).Value)
                         .First
-                        .InnerHTMLAsync();
-                }
+                        .GetAttributeAsync("datetime");
 
-                var userTitle = await element
-                    .Locator(selectors.First(x => x.Type == SelectorType.UserTitle).Value)
-                    .First
-                    .InnerTextAsync();
-
-                var commentCount = await element
-                    .Locator(selectors.First(x => x.Type == SelectorType.Comment).Value)
-                    .First
-                    .InnerTextAsync();
-
-                var reShareCount = await element
-                    .Locator(selectors.First(x => x.Type == SelectorType.ReShare).Value)
-                    .First
-                    .InnerTextAsync();
-
-                string? likeCountStr = null;
-                var likeSelector = selectors.First(x => x.Type == SelectorType.Like).Value;
-                var likeCount = await element
-                    .Locator(likeSelector)
-                    .CountAsync();
-                if (likeCount == 0)
-                {
-                    var unlikeSelector = selectors.First(x => x.Type == SelectorType.UnLike).Value;
-                    likeCount = await element
-                        .Locator(unlikeSelector)
+                    string? text = null;
+                    var textSelector = selectors.First(x => x.Type == SelectorType.Text).Value;
+                    var textCount = await element
+                        .Locator(textSelector)
                         .CountAsync();
-                    if (likeCount > 0)
+                    if (textCount > 0)
+                    {
+                        text = await element
+                            .Locator(textSelector)
+                            .First
+                            .InnerHTMLAsync();
+                    }
+
+                    var userTitle = await element
+                        .Locator(selectors.First(x => x.Type == SelectorType.UserTitle).Value)
+                        .First
+                        .InnerTextAsync();
+
+                    var commentCount = await element
+                        .Locator(selectors.First(x => x.Type == SelectorType.Comment).Value)
+                        .First
+                        .InnerTextAsync();
+
+                    var reShareCount = await element
+                        .Locator(selectors.First(x => x.Type == SelectorType.ReShare).Value)
+                        .First
+                        .InnerTextAsync();
+
+                    string? likeCountStr = null;
+                    var likeSelector = selectors.First(x => x.Type == SelectorType.Like).Value;
+                    var likeCount = await element
+                        .Locator(likeSelector)
+                        .CountAsync();
+                    if (likeCount == 0)
+                    {
+                        var unlikeSelector = selectors.First(x => x.Type == SelectorType.UnLike).Value;
+                        likeCount = await element
+                            .Locator(unlikeSelector)
+                            .CountAsync();
+                        if (likeCount > 0)
+                        {
+                            likeCountStr = await element
+                                .Locator(unlikeSelector)
+                                .First
+                                .InnerTextAsync();
+                        }
+                    }
+                    else
                     {
                         likeCountStr = await element
-                            .Locator(unlikeSelector)
+                            .Locator(likeSelector)
                             .First
                             .InnerTextAsync();
                     }
-                }
-                else
-                {
-                    likeCountStr = await element
-                        .Locator(likeSelector)
-                        .First
-                        .InnerTextAsync();
-                }
 
 
-                string? parentLink = null;
-                if (articles.Count > 0)
-                {
-                    var previousArticle = articles.Last();
-                    if (userTitle != previousArticle.UserTitle)
+                    string? parentLink = null;
+                    if (articles.Count > 0)
                     {
-                        parentLink = previousArticle.Link;
+                        var previousArticle = articles.Last();
+                        if (userTitle != previousArticle.UserTitle)
+                        {
+                            parentLink = previousArticle.Link;
+                        }
                     }
+
+                    var article = new Article
+                    {
+                        AddressId = address.Id,
+                        CommentCount = commentCount,
+                        LikeCount = likeCountStr,
+                        ReShareCount = reShareCount,
+                        Text = CleanHtml(text),
+                        Time = time!,
+                        UserTitle = userTitle,
+                        CreateDate = DateTime.UtcNow,
+                        Link = link,
+                        ParentLink = parentLink
+                    };
+
+                    articles.Add(article);
                 }
 
-                var article = new Article
+
+                await page.EvaluateAsync("window.scrollBy(0, 500);");
+                await page.WaitForTimeoutAsync(3_000);
+                if (articles.Count > 100)
                 {
-                    CommentCount = commentCount,
-                    LikeCount = likeCountStr,
-                    ReShareCount = reShareCount,
-                    Text = CleanHtml(text),
-                    Time = time!,
-                    UserTitle = userTitle,
-                    CreateDate = DateTime.UtcNow,
-                    Link = link,
-                    ParentLink = parentLink
-                };
-
-                articles.Add(article);
+                    await articleRepo.AddRangeAsync(articles, ct);
+                    await articleRepo.SaveChangesAsync(ct);
+                    articles = [];
+                }
             }
-
-
-            await page.EvaluateAsync("window.scrollBy(0, 500);");
-            await page.WaitForTimeoutAsync(3_000);
+            if (articles.Count > 0)
+            {
+                await articleRepo.AddRangeAsync(articles, ct);
+                await articleRepo.SaveChangesAsync(ct);
+                articles = [];
+            }
         }
-
-        if (articles.Count > 0)
+        catch (Exception e)
         {
-            await articleRepo.AddRangeAsync(articles, ct);
-            await articleRepo.SaveChangesAsync(ct);
+            if (articles.Count > 0)
+            {
+                await articleRepo.AddRangeAsync(articles, ct);
+                await articleRepo.SaveChangesAsync(ct);
+            }
+            logger.LogInformation($"{articles.Count} articles has been added to the database. by the {address.Url}");
+            Console.WriteLine(e);
+            throw;
         }
     }
 
+    [DisableConcurrentExecution(timeoutInSeconds: 2_000)]
     public async Task StartScrapping(CancellationToken ct = default)
     {
         var addresses = await addressRepo.GetAll(ct);

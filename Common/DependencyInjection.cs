@@ -24,6 +24,7 @@ public static class DependencyInjection
             ).CreateLogger();
         
         builder.Services.AddSerilog(log);
+        builder.Host.UseSerilog();
     }
 
     public static void AddDependencies(this WebApplicationBuilder builder)

@@ -49,10 +49,10 @@ app.UseExceptionHandler(exceptionHandlerApp =>
         Log.Error(ex, $"Error Message: {ex.Message}");
     });
 });
-
+app.UseHangfireDashboard();
 if (app.Environment.IsDevelopment())
 {
-    app.UseHangfireDashboard();
+
     
 }
 else
@@ -61,7 +61,7 @@ else
 }
 
 
-HangfireHelper.SetUpdateArticleJobId();
+// HangfireHelper.SetUpdateArticleJobId();
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
