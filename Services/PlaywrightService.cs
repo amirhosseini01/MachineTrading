@@ -50,6 +50,18 @@ public class PlaywrightService(ISelectorRepo selectorRepo, IArticleRepo articleR
             await using var browser = await playwright.Chromium.LaunchPersistentContextAsync(UserDataDir, new BrowserTypeLaunchPersistentContextOptions { Headless = false, Timeout =  ThirtyMinuteAsMilliSecond});
 
             var page = browser.Pages.Count > 0 ? browser.Pages[0] : await browser.NewPageAsync();
+            await page.SetExtraHTTPHeadersAsync(new Dictionary<string, string>
+            {
+                { "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36" },
+                { "Accept-Language", "en-US,en;q=0.9" },
+                { "Referer", "https://www.google.com/" }
+            });
+            await page.AddInitScriptAsync(@"navigator.webdriver = undefined;");
+            await page.EvaluateAsync("""
+                                     () => {
+                                                     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                                                 }
+                                     """);
 
             await page.GotoAsync(address.Url);
             await page.WaitForTimeoutAsync(2_000);
@@ -57,7 +69,7 @@ public class PlaywrightService(ISelectorRepo selectorRepo, IArticleRepo articleR
             
             var selectors = await selectorRepo.GetAll(ct: ct);
             var previousArticles = await articleRepo.GetAll(takeSize: 1000, ct: ct);
-            int duplicateCounter = 0;
+            var duplicateCounter = 0;
             while (continueScrapping)
             {
                 duplicateCounter++;
@@ -211,8 +223,8 @@ public class PlaywrightService(ISelectorRepo selectorRepo, IArticleRepo articleR
                 }
 
 
-                await page.EvaluateAsync("window.scrollBy(0, 500);");
-                await page.WaitForTimeoutAsync(3_000);
+                await page.EvaluateAsync("window.scrollBy(0, 300);");
+                await page.WaitForTimeoutAsync(1_000);
                 if (articles.Count > 100)
                 {
                     await articleRepo.AddRangeAsync(articles, ct);

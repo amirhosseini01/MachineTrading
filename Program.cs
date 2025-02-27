@@ -61,7 +61,7 @@ else
 }
 
 
-// HangfireHelper.SetUpdateArticleJobId();
+HangfireHelper.SetUpdateArticleJobId();
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
